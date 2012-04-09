@@ -162,41 +162,42 @@ public abstract class DbreTypeUtils {
     }
 
     private static String getName(String str, final boolean isField) {
-        
-		if (!isField) {
-			if (DbreTypeUtils.tableMappings != null) {
-				// apply any matching tableMapping entries
-				boolean matchComplete = false;
-				while (matchComplete == false) {
-					matchComplete = true;
-					for (Entry<Object, Object> mapping : DbreTypeUtils.tableMappings
-							.entrySet()) {
-						if (str.matches("(?i)" + mapping.getKey())) {
-							str = str.replaceAll("(?i)" + mapping.getKey(),
-									String.valueOf(mapping.getValue()));
-							matchComplete = false; // need to rematch
-						}
-					}
-				}
-			}
-			if (DbreTypeUtils.tableMapper != null) {
-				// invoke a groovy table mapper that must expose a String
-				// getName(String) method
-				try {
-					final GroovyShell groovyShell = new GroovyShell();
-					Script groovyScript = groovyShell
-							.parse(DbreTypeUtils.tableMapper);
 
-					str = (String) groovyScript.invokeMethod("getName",
-							new Object[] { str });
-				} catch (Throwable e) {
-					throw new RuntimeException(
-							"Unable to invoke groovy table mapper", e);
-				}
-			}
-			// str = Inflector.getInstance().singularize(str).toUpperCase();
-		}
-         
+        if (!isField) {
+            if (DbreTypeUtils.tableMappings != null) {
+                // apply any matching tableMapping entries
+                boolean matchComplete = false;
+                while (matchComplete == false) {
+                    matchComplete = true;
+                    for (Entry<Object, Object> mapping : DbreTypeUtils.tableMappings
+                            .entrySet()) {
+                        if (str.matches("(?i)" + mapping.getKey())) {
+                            str = str.replaceAll("(?i)" + mapping.getKey(),
+                                    String.valueOf(mapping.getValue()));
+                            matchComplete = false; // need to rematch
+                        }
+                    }
+                }
+            }
+            if (DbreTypeUtils.tableMapper != null) {
+                // invoke a groovy table mapper that must expose a String
+                // getName(String) method
+                try {
+                    final GroovyShell groovyShell = new GroovyShell();
+                    Script groovyScript = groovyShell
+                            .parse(DbreTypeUtils.tableMapper);
+
+                    str = (String) groovyScript.invokeMethod("getName",
+                            new Object[] { str });
+                }
+                catch (Throwable e) {
+                    throw new RuntimeException(
+                            "Unable to invoke groovy table mapper", e);
+                }
+            }
+            str = Inflector.getInstance().singularize(str).toUpperCase();
+        }
+
         final StringBuilder result = new StringBuilder();
         boolean isDelimChar = false;
         for (int i = 0; i < str.length(); i++) {
