@@ -3,13 +3,19 @@ package org.springframework.roo.addon.dbre;
 import static org.springframework.roo.model.JpaJavaType.TABLE;
 import static org.springframework.roo.model.RooJavaType.ROO_JPA_ACTIVE_RECORD;
 import static org.springframework.roo.model.RooJavaType.ROO_JPA_ENTITY;
+import groovy.lang.GroovyObject;
+import groovy.lang.GroovyShell;
+import groovy.lang.Script;
 
+import java.io.File;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Properties;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
+import org.modeshape.common.text.Inflector;
 import org.springframework.roo.addon.dbre.model.DbreModelService;
 import org.springframework.roo.addon.dbre.model.Table;
 import org.springframework.roo.classpath.details.ClassOrInterfaceTypeDetails;
@@ -43,6 +49,9 @@ public abstract class DbreTypeUtils {
     // The annotation attributes from which to read the db table name
     // Linked to preserve the iteration order below
     private static final Map<JavaType, JavaSymbolName> TABLE_ATTRIBUTES = new LinkedHashMap<JavaType, JavaSymbolName>();
+
+    private static Properties tableMappings = null;
+    private static File tableMapper = null;
 
     static {
         TABLE_ATTRIBUTES.put(TABLE, NAME_ATTRIBUTE);
@@ -152,7 +161,42 @@ public abstract class DbreTypeUtils {
         return null;
     }
 
-    private static String getName(final String str, final boolean isField) {
+    private static String getName(String str, final boolean isField) {
+        
+		if (!isField) {
+			if (DbreTypeUtils.tableMappings != null) {
+				// apply any matching tableMapping entries
+				boolean matchComplete = false;
+				while (matchComplete == false) {
+					matchComplete = true;
+					for (Entry<Object, Object> mapping : DbreTypeUtils.tableMappings
+							.entrySet()) {
+						if (str.matches("(?i)" + mapping.getKey())) {
+							str = str.replaceAll("(?i)" + mapping.getKey(),
+									String.valueOf(mapping.getValue()));
+							matchComplete = false; // need to rematch
+						}
+					}
+				}
+			}
+			if (DbreTypeUtils.tableMapper != null) {
+				// invoke a groovy table mapper that must expose a String
+				// getName(String) method
+				try {
+					final GroovyShell groovyShell = new GroovyShell();
+					Script groovyScript = groovyShell
+							.parse(DbreTypeUtils.tableMapper);
+
+					str = (String) groovyScript.invokeMethod("getName",
+							new Object[] { str });
+				} catch (Throwable e) {
+					throw new RuntimeException(
+							"Unable to invoke groovy table mapper", e);
+				}
+			}
+			// str = Inflector.getInstance().singularize(str).toUpperCase();
+		}
+         
         final StringBuilder result = new StringBuilder();
         boolean isDelimChar = false;
         for (int i = 0; i < str.length(); i++) {
@@ -220,6 +264,14 @@ public abstract class DbreTypeUtils {
         Validate.notNull(entityDetails,
                 "MemberHoldingTypeDetails type required");
         return getFirstNonBlankAttributeValue(entityDetails, TABLE_ATTRIBUTES);
+    }
+
+    public static void setTableMapper(File tableMapper) {
+        DbreTypeUtils.tableMapper = tableMapper;
+    }
+
+    public static void setTableMappings(Properties tableMappings) {
+        DbreTypeUtils.tableMappings = tableMappings;
     }
 
     /**
